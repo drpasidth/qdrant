@@ -1,0 +1,446 @@
+{
+  "name": "myn8n_worldnews",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            },
+            {}
+          ]
+        }
+      },
+      "name": "Schedule Trigger1",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        432,
+        480
+      ],
+      "id": "1f58372e-cbab-43b6-b043-1c7bf7377277"
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/top-headlines",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "category",
+              "value": "business"
+            },
+            {
+              "name": "pageSize",
+              "value": "20"
+            },
+            {
+              "name": "apiKey",
+              "value": "=c15eb751f5cb4cbf992cadb1c1d6c6fd"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get US Business News1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        640,
+        288
+      ],
+      "id": "339c7dab-64ab-4eb1-bb95-5c6267538198",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "YMWxN1q8WJI6OUlo",
+          "name": "Query Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/top-headlines",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "category",
+              "value": "business"
+            },
+            {
+              "name": "country",
+              "value": "gb"
+            },
+            {
+              "name": "pageSize",
+              "value": "15"
+            },
+            {
+              "name": "apiKey",
+              "value": "=c15eb751f5cb4cbf992cadb1c1d6c6fd"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get UK Business News1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        640,
+        464
+      ],
+      "id": "29664bc8-575a-46ba-a795-742c3f8073e5",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "YMWxN1q8WJI6OUlo",
+          "name": "Query Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://newsapi.org/v2/top-headlines",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "category",
+              "value": "business"
+            },
+            {
+              "name": "country",
+              "value": "jp"
+            },
+            {
+              "name": "pageSize",
+              "value": "10"
+            },
+            {
+              "name": "apiKey",
+              "value": "=c15eb751f5cb4cbf992cadb1c1d6c6fd"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Japan Business News1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        640,
+        624
+      ],
+      "id": "3c8b1a42-9bb5-4341-a55d-9ddf4ae8712b",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "YMWxN1q8WJI6OUlo",
+          "name": "Query Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "allNews",
+        "include": "specifiedFields",
+        "options": {}
+      },
+      "name": "Merge News Sources1",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        864,
+        432
+      ],
+      "id": "55d23d37-28c0-4c25-bc4f-aedc959728e3"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "allNews",
+        "options": {}
+      },
+      "name": "Split Articles1",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        320
+      ],
+      "id": "e6d8cf9a-5b43-45e4-85d6-165571acff40"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "articles",
+        "options": {}
+      },
+      "name": "Split Individual Articles1",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1184,
+        320
+      ],
+      "id": "37559c11-6bec-45d6-9a6f-c5991112a145"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.title }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "leftValue": "={{ $json.description }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combineOperation": "all"
+        },
+        "options": {}
+      },
+      "name": "Filter Valid Articles1",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        320
+      ],
+      "id": "b29b4ee8-5edb-4e6c-a0bb-8fd705a50c92"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "name": "Format Article Data1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        1040,
+        544
+      ],
+      "id": "f51ab78e-e841-4573-9581-453c00d0384e"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "newsReport",
+        "options": {}
+      },
+      "name": "Aggregate Final Report1",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        544
+      ],
+      "id": "7c1b0d53-f841-4072-8845-34db96a5f3da"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the input data from the previous node\nconst inputData = $input.all();\n\n// Initialize variables\nlet articles = [];\nlet articleCount = 0;\n\n// Process the input data to extract articles\nif (inputData && inputData.length > 0) {\n  // Check if we have newsReport data\n  if (inputData[0].json && inputData[0].json.newsReport) {\n    const newsReport = inputData[0].json.newsReport;\n    \n    // If newsReport is an array, process each item\n    if (Array.isArray(newsReport)) {\n      articles = newsReport.filter(item => item.source && item.source.name);\n      articleCount = articles.length;\n    } else if (newsReport.source && newsReport.source.name) {\n      // If it's a single object, wrap it in an array\n      articles = [newsReport];\n      articleCount = 1;\n    }\n  } else {\n    // Check if the data is directly in the json object\n    const jsonData = inputData[0].json;\n    if (jsonData.source && jsonData.source.name) {\n      articles = [jsonData];\n      articleCount = 1;\n    }\n  }\n}\n\n// Generate current date\nconst currentDate = new Date().toLocaleDateString('en-US', {\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric'\n});\n\n// Generate HTML content\nlet htmlContent = `\n<!DOCTYPE html>\n<html>\n<head>\n    <style>\n        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n        .header { background-color: #2c3e50; color: white; padding: 20px; text-align: center; }\n        .news-item { margin: 20px 0; padding: 15px; border-left: 4px solid #3498db; background-color: #f8f9fa; }\n        .news-title { font-weight: bold; color: #2c3e50; margin-bottom: 8px; }\n        .news-source { color: #7f8c8d; font-size: 0.9em; margin-bottom: 5px; }\n        .news-summary { margin-bottom: 10px; }\n        .read-more { color: #3498db; text-decoration: none; }\n        .footer { text-align: center; margin-top: 30px; color: #7f8c8d; }\n    </style>\n</head>\n<body>\n    <div class=\"header\">\n        <h1>📰 Daily Business News Report</h1>\n        <p>${currentDate}</p>\n    </div>\n`;\n\n// Generate text content\nlet textContent = `DAILY BUSINESS NEWS REPORT\\n${currentDate}\\n${'='.repeat(50)}\\n\\n`;\n\nif (articleCount > 0) {\n    htmlContent += `<p>📈 Generated by n8n workflow</p><p>📊 Total articles: ${articleCount}</p>\\n`;\n    textContent += `Generated by n8n workflow\\nTotal articles: ${articleCount}\\n\\n`;\n    \n    // Process each article\n    articles.forEach((article, index) => {\n        const source = article.source || {};\n        const title = article.title || 'No title available';\n        const description = article.description || 'No description available';\n        const url = article.url || '#';\n        const author = article.author || 'Unknown';\n        const sourceName = source.name || source.id || 'Unknown Source';\n        \n        // Add to HTML content\n        htmlContent += `\n        <div class=\"news-item\">\n            <div class=\"news-source\">${sourceName} | ${author}</div>\n            <div class=\"news-title\">${title}</div>\n            <div class=\"news-summary\">${description}</div>\n            <a href=\"${url}\" class=\"read-more\">Read more →</a>\n        </div>`;\n        \n        // Add to text content\n        textContent += `${index + 1}. ${title}\\n`;\n        textContent += `Source: ${sourceName} | Author: ${author}\\n`;\n        textContent += `${description}\\n`;\n        textContent += `Link: ${url}\\n\\n`;\n    });\n} else {\n    htmlContent += `<p>❌ No business news articles found today.</p>\\n`;\n    textContent += `No business news articles found today.\\n\\n`;\n}\n\n// Close HTML\nhtmlContent += `\n    <div class=\"footer\">\n        <p>This report was generated automatically by n8n workflow</p>\n        <p>Report Date: ${currentDate}</p>\n    </div>\n</body>\n</html>`;\n\ntextContent += `\\nThis report was generated automatically by n8n workflow\\nReport Date: ${currentDate}`;\n\n// Return the formatted data\nreturn [{\n    json: {\n        htmlContent: htmlContent,\n        textContent: textContent,\n        articleCount: articleCount,\n        reportDate: currentDate,\n        articles: articles\n    }\n}];"
+      },
+      "name": "Generate Email Report1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        544
+      ],
+      "id": "37f32962-f05a-4f7b-9ceb-8e5250e71a73"
+    },
+    {
+      "parameters": {
+        "fromEmail": "psevolutionth@gmail.com",
+        "toEmail": "pasidthdr@gmail.com",
+        "subject": "=Daily Business News Report - {{ $json.reportDate }}",
+        "html": "=<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <style>\n        body { \n            font-family: Arial, sans-serif; \n            line-height: 1.6; \n            color: #333; \n            max-width: 600px; \n            margin: 0 auto; \n            background-color: #f4f4f4;\n        }\n        .container {\n            background-color: white;\n            margin: 20px auto;\n            border-radius: 8px;\n            overflow: hidden;\n            box-shadow: 0 4px 6px rgba(0,0,0,0.1);\n        }\n        .header { \n            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n            color: white; \n            padding: 30px 20px; \n            text-align: center; \n        }\n        .header h1 { \n            margin: 0; \n            font-size: 24px; \n        }\n        .stats {\n            background-color: #f8f9fa;\n            padding: 15px 20px;\n            border-bottom: 2px solid #e9ecef;\n            text-align: center;\n        }\n        .news-item { \n            margin: 0; \n            padding: 20px; \n            border-bottom: 1px solid #eee; \n        }\n        .news-item:last-child {\n            border-bottom: none;\n        }\n        .news-source { \n            color: #666; \n            font-size: 12px; \n            margin-bottom: 8px; \n            text-transform: uppercase;\n            letter-spacing: 0.5px;\n        }\n        .news-title { \n            font-weight: bold; \n            color: #2c3e50; \n            margin-bottom: 10px; \n            font-size: 18px;\n            line-height: 1.3;\n        }\n        .news-title a {\n            color: #2c3e50;\n            text-decoration: none;\n        }\n        .news-title a:hover {\n            color: #3498db;\n        }\n        .news-description { \n            margin-bottom: 12px; \n            color: #555;\n            line-height: 1.5;\n        }\n        .read-more { \n            display: inline-block;\n            background-color: #3498db;\n            color: white !important; \n            text-decoration: none;\n            padding: 8px 16px;\n            border-radius: 4px;\n            font-size: 12px;\n        }\n        .read-more:hover {\n            background-color: #2980b9;\n        }\n        .footer { \n            text-align: center; \n            padding: 20px;\n            background-color: #2c3e50;\n            color: white;\n            font-size: 12px;\n        }\n        .no-news {\n            text-align: center;\n            padding: 40px 20px;\n            color: #666;\n        }\n        @media only screen and (max-width: 600px) {\n            body { margin: 0; }\n            .container { margin: 0; border-radius: 0; }\n            .header h1 { font-size: 20px; }\n            .news-title { font-size: 16px; }\n        }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <div class=\"header\">\n            <h1>📰 Daily Business News Report</h1>\n            <p>{{ $json.reportDate }}</p>\n        </div>\n        \n        <div class=\"stats\">\n            <p><strong>📊 {{ $json.articleCount }} articles found</strong> | Generated automatically</p>\n        </div>\n        \n        <!-- This will use the pre-generated HTML content from your previous node -->\n        <div style=\"padding: 0;\">\n            {{ $json.htmlContent }}\n        </div>\n        \n        <div class=\"footer\">\n            <p><strong>Automated News Report</strong></p>\n            <p>Generated on {{ $json.reportDate }} by n8n workflow</p>\n        </div>\n    </div>\n</body>\n</html>",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "name": "Send Email Report1",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1616,
+        544
+      ],
+      "id": "1a6dce2e-7d4b-45bc-8cf3-9922626bdde6",
+      "webhookId": "4de52dac-83a0-4e5e-ac46-da4bdb15e9c4",
+      "credentials": {
+        "smtp": {
+          "id": "aWjrYiNuc8kFdLXT",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Get US Business News1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get UK Business News1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Japan Business News1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get US Business News1": {
+      "main": [
+        [
+          {
+            "node": "Merge News Sources1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get UK Business News1": {
+      "main": [
+        [
+          {
+            "node": "Merge News Sources1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Japan Business News1": {
+      "main": [
+        [
+          {
+            "node": "Merge News Sources1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge News Sources1": {
+      "main": [
+        [
+          {
+            "node": "Split Articles1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Articles1": {
+      "main": [
+        [
+          {
+            "node": "Split Individual Articles1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Individual Articles1": {
+      "main": [
+        [
+          {
+            "node": "Filter Valid Articles1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Valid Articles1": {
+      "main": [
+        [
+          {
+            "node": "Format Article Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Article Data1": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Final Report1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Final Report1": {
+      "main": [
+        [
+          {
+            "node": "Generate Email Report1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email Report1": {
+      "main": [
+        [
+          {
+            "node": "Send Email Report1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c8867ac9-16be-4b0e-bbba-9b84a20c21ee",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4bb4a68fdd357fb01031eb3ecc86b085d8269ff27ce26b5cf53f4afa0ad6fb17"
+  },
+  "id": "qGk4BnPsySPPWWqR",
+  "tags": []
+}
