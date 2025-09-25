@@ -1,0 +1,1212 @@
+{
+  "name": "soilMonitoring",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        }
+      },
+      "name": "Data Simulator Trigger",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        -1072,
+        208
+      ],
+      "id": "8e6f445d-327f-49d6-863c-d98cc8b95e60",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "functionCode": "// Realistic Soil Moisture Data Simulator\nconst now = new Date();\nconst hour = now.getHours();\nconst minute = now.getMinutes();\n\n// Base moisture level (varies by time of day)\nlet baseMoisture;\nif (hour >= 6 && hour <= 10) {\n  // Morning - higher moisture from dew\n  baseMoisture = 65 + Math.sin((hour - 6) / 4 * Math.PI) * 10;\n} else if (hour >= 11 && hour <= 16) {\n  // Midday - decreasing moisture due to evaporation\n  baseMoisture = 55 - Math.sin((hour - 11) / 5 * Math.PI) * 15;\n} else if (hour >= 17 && hour <= 20) {\n  // Evening - stabilizing\n  baseMoisture = 45 + Math.sin((hour - 17) / 3 * Math.PI) * 8;\n} else {\n  // Night - gradual recovery\n  baseMoisture = 50 + Math.sin((hour + 12) / 12 * Math.PI) * 5;\n}\n\n// Add random variation (-5% to +5%)\nconst moistureVariation = (Math.random() - 0.5) * 10;\nconst moistureLevel = Math.max(0, Math.min(100, baseMoisture + moistureVariation));\n\n// Temperature simulation (realistic daily cycle)\nconst baseTemp = 25; // Base temperature\nconst tempVariation = Math.sin((hour - 6) / 12 * Math.PI) * 15; // Daily cycle\nconst randomTempVar = (Math.random() - 0.5) * 3; // Random variation\nconst temperature = Math.round((baseTemp + tempVariation + randomTempVar) * 10) / 10;\n\n// Humidity simulation (inverse relationship with temperature)\nconst baseHumidity = 65;\nconst humidityVar = -tempVariation * 0.8 + (Math.random() - 0.5) * 10;\nconst humidity = Math.max(20, Math.min(95, baseHumidity + humidityVar));\n\n// Battery level (slowly decreasing)\nconst dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));\nconst batteryLevel = Math.max(10, 100 - (dayOfYear * 0.2) + (Math.random() - 0.5) * 5);\n\n// Simulate different devices\nconst devices = [\n  { id: 'SOIL_001', name: 'Field A - Tomatoes', lat: 40.7128, lng: -74.0060 },\n  { id: 'SOIL_002', name: 'Field B - Carrots', lat: 40.7580, lng: -73.9855 },\n  { id: 'SOIL_003', name: 'Greenhouse 1', lat: 40.7282, lng: -74.0776 }\n];\n\n// Randomly select a device (or cycle through them)\nconst deviceIndex = minute % devices.length;\nconst selectedDevice = devices[deviceIndex];\n\n// Create realistic data payload\nconst simulatedData = {\n  device_id: selectedDevice.id,\n  device_name: selectedDevice.name,\n  moisture_level: Math.round(moistureLevel * 100) / 100,\n  temperature: temperature,\n  humidity: Math.round(humidity * 100) / 100,\n  battery_level: Math.round(batteryLevel * 100) / 100,\n  location_lat: selectedDevice.lat,\n  location_lng: selectedDevice.lng,\n  timestamp: now.toISOString(),\n  signal_strength: Math.floor(Math.random() * 30) + 70, // 70-100%\n  sensor_status: 'active',\n  simulation: true // Flag to identify simulated data\n};\n\n// Occasionally simulate alert conditions for testing\nif (Math.random() < 0.1) { // 10% chance\n  if (Math.random() < 0.5) {\n    simulatedData.moisture_level = 15 + Math.random() * 10; // Low moisture\n  } else {\n    simulatedData.moisture_level = 85 + Math.random() * 10; // High moisture\n  }\n}\n\n// Occasionally simulate device issues\nif (Math.random() < 0.05) { // 5% chance\n  simulatedData.battery_level = 5 + Math.random() * 10; // Low battery\n  simulatedData.signal_strength = 20 + Math.random() * 30; // Poor signal\n}\n\nreturn {\n  json: simulatedData\n};"
+      },
+      "name": "Generate Realistic Data",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        -848,
+        208
+      ],
+      "id": "89a071bc-a6c1-41b3-8993-18e0eb5d5efe",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.simulation }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              },
+              "id": "1ab8b88f-0f03-4554-ac75-b43dec6212ab"
+            },
+            {
+              "id": "41d28bcd-ab85-4fb9-a616-cd94457b4982",
+              "leftValue": "={{ $json.device_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "name": "Is Simulation Data",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -320,
+        208
+      ],
+      "id": "1bf88370-1b26-4ff9-b3c0-8a6938510a9e",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "functionCode": "// Add simulation metadata and prepare for database\nconst data = $input.first().json;\n\n// Add additional simulation metadata\ndata.data_source = 'simulation';\ndata.created_at = new Date().toISOString();\n\n// Log simulation data for debugging\nconsole.log(`Simulated data for ${data.device_id}: Moisture ${data.moisture_level}%, Temp ${data.temperature}°C`);\n\nreturn {\n  json: data\n};"
+      },
+      "name": "Process Simulation",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        -80,
+        192
+      ],
+      "id": "048815c7-9b53-451c-893e-5deade40ce25",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO soil_moisture_readings (device_id, moisture_level, temperature, humidity, battery_level, location_lat, location_lng, data_source) VALUES ('{{ $json.device_id }}',{{ $json.moisture_level }}, {{ $json.temperature }}, {{ $json.humidity }}, {{ $json.battery_level }},{{ $json.location_lat }}, {{ $json.location_lng }}, '{{ $json.data_source }}' ) RETURNING *",
+        "options": {}
+      },
+      "name": "Store in PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        -336,
+        464
+      ],
+      "id": "e557aa84-88d1-42cf-a04d-d1cee847e2b1",
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "VIY3W9w1gQbbmZuZ",
+          "name": "Postgres account soil"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "name": "Test Alert Scenarios",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        -1072,
+        384
+      ],
+      "id": "9e8be3b7-70d2-4e51-91fe-ff8f2cb14e85",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO alerts (device_id, alert_type, moisture_level, temperature, battery_level, message) \nVALUES (\n  '{{ $json.device_id }}',\n  '{{ $json.moisture_level < 30 ? \"low_moisture\" : \"high_moisture\" }}',\n  {{ $json.moisture_level }},\n  {{ $json.temperature }},\n  {{ $json.battery_level }},\n  'Alert: Moisture level {{ $json.moisture_level }}% on device {{ $json.device_id }}'\n) \nRETURNING *",
+        "options": {}
+      },
+      "name": "Log Alert to Database",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        992,
+        240
+      ],
+      "id": "6466b8dc-d2f3-4368-8b8e-be0fd2e082c5",
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "VIY3W9w1gQbbmZuZ",
+          "name": "Postgres account soil"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "psevolutionth@gmail.com",
+        "toEmail": "pasidthdr@gmail.com",
+        "subject": "🌱 Soil Alert - {{ $json.device_id }} ({{ $json.data_source }})",
+        "html": "=<!DOCTYPE html>\n<html>\n<head>\n    <style>\n        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n        .container { max-width: 600px; margin: 0 auto; padding: 20px; }\n        .header { background: #1e3c72; color: white; padding: 20px; border-radius: 8px 8px 0 0; }\n        .alert-high { border-left: 5px solid #f44336; background: #ffebee; padding: 15px; }\n        .alert-low { border-left: 5px solid #ff9800; background: #fff3e0; padding: 15px; }\n        .alert-normal { border-left: 5px solid #4caf50; background: #e8f5e8; padding: 15px; }\n        .data-table { width: 100%; border-collapse: collapse; margin: 15px 0; }\n        .data-table th, .data-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }\n        .data-table th { background: #f5f5f5; font-weight: bold; }\n        .recommendation { background: #e3f2fd; padding: 15px; border-radius: 5px; margin: 15px 0; }\n        .footer { background: #f5f5f5; padding: 15px; border-radius: 0 0 8px 8px; text-align: center; }\n        .status-critical { color: #f44336; font-weight: bold; }\n        .status-warning { color: #ff9800; font-weight: bold; }\n        .status-normal { color: #4caf50; font-weight: bold; }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <div class=\"header\">\n            <h1>🌱 Soil Monitoring Alert</h1>\n            <p>Automated alert from your soil monitoring system</p>\n        </div>\n\n        <div class=\"{{ $json.moisture_level < 25 ? 'alert-high' : ($json.moisture_level < 35 ? 'alert-low' : 'alert-normal') }}\">\n            <h2>\n                {{ $json.moisture_level < 25 ? '🚨 CRITICAL ALERT' : ($json.moisture_level < 35 ? '⚠️ WARNING' : '✅ NOTIFICATION') }}\n            </h2>\n            <p><strong>Device:</strong> {{ $json.device_id }}{{ $json.device_name ? ' (' + $json.device_name + ')' : '' }}</p>\n            <p><strong>Alert Time:</strong> {{ new Date().toLocaleString() }}</p>\n            <p><strong>Status:</strong> \n                <span class=\"{{ $json.moisture_level < 25 ? 'status-critical' : ($json.moisture_level < 35 ? 'status-warning' : 'status-normal') }}\">\n                    {{ $json.moisture_level < 25 ? 'IMMEDIATE ACTION REQUIRED' : ($json.moisture_level < 35 ? 'ATTENTION NEEDED' : 'NORMAL OPERATION') }}\n                </span>\n            </p>\n        </div>\n\n        <h3>📊 Current Readings</h3>\n        <table class=\"data-table\">\n            <tr>\n                <th>Parameter</th>\n                <th>Current Value</th>\n                <th>Status</th>\n                <th>Threshold</th>\n            </tr>\n            <tr>\n                <td>Soil Moisture</td>\n                <td>{{ $json.moisture_level }}%</td>\n                <td class=\"{{ $json.moisture_level < 30 ? 'status-critical' : ($json.moisture_level > 80 ? 'status-warning' : 'status-normal') }}\">\n                    {{ $json.moisture_level < 30 ? 'LOW' : ($json.moisture_level > 80 ? 'HIGH' : 'NORMAL') }}\n                </td>\n                <td>30-80%</td>\n            </tr>\n            <tr>\n                <td>Temperature</td>\n                <td>{{ $json.temperature }}°C</td>\n                <td class=\"{{ $json.temperature > 35 ? 'status-warning' : 'status-normal' }}\">\n                    {{ $json.temperature > 35 ? 'HIGH' : 'NORMAL' }}\n                </td>\n                <td>&lt; 35°C</td>\n            </tr>\n            <tr>\n                <td>Humidity</td>\n                <td>{{ $json.humidity }}%</td>\n                <td class=\"status-normal\">NORMAL</td>\n                <td>40-90%</td>\n            </tr>\n            <tr>\n                <td>Battery Level</td>\n                <td>{{ $json.battery_level }}%</td>\n                <td class=\"{{ $json.battery_level < 20 ? 'status-critical' : ($json.battery_level < 40 ? 'status-warning' : 'status-normal') }}\">\n                    {{ $json.battery_level < 20 ? 'LOW' : ($json.battery_level < 40 ? 'FAIR' : 'GOOD') }}\n                </td>\n                <td>&gt; 20%</td>\n            </tr>\n        </table>\n\n        {{ $json.ai_recommendation ? '<div class=\"recommendation\"><h3>🤖 AI Recommendations</h3><p>' + $json.ai_recommendation + '</p></div>' : '' }}\n\n        <h3>📍 Device Information</h3>\n        <ul>\n            <li><strong>Location:</strong> {{ $json.location_name || 'Field Location' }}</li>\n            <li><strong>Coordinates:</strong> {{ $json.location_lat }}, {{ $json.location_lng }}</li>\n            <li><strong>Data Source:</strong> {{ $json.data_source }}</li>\n            <li><strong>Signal Strength:</strong> {{ $json.signal_strength }}%</li>\n        </ul>\n\n        <h3>⚡ Immediate Actions</h3>\n        <ul>\n            {{ $json.moisture_level < 25 ? '<li style=\"color: #f44336;\"><strong>URGENT:</strong> Activate irrigation system immediately</li>' : '' }}\n            {{ $json.moisture_level < 35 ? '<li style=\"color: #ff9800;\">Schedule irrigation within the next 6 hours</li>' : '' }}\n            {{ $json.battery_level < 20 ? '<li style=\"color: #f44336;\">Replace sensor battery immediately</li>' : '' }}\n            {{ $json.temperature > 35 ? '<li style=\"color: #ff9800;\">Consider shade or cooling measures</li>' : '' }}\n            <li>Monitor system closely for the next 24 hours</li>\n            <li>Check weather forecast for precipitation</li>\n        </ul>\n\n        <div class=\"footer\">\n            <p><strong>Soil Monitoring System</strong></p>\n            <p>Generated at: {{ new Date().toISOString() }}</p>\n            <p>For support, contact: support@yourfarm.com</p>\n        </div>\n    </div>\n</body>\n</html>",
+        "options": {}
+      },
+      "name": "Send Email Alert",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        848,
+        512
+      ],
+      "id": "7fbd29f2-4437-4c9b-9f4d-187068ef7a76",
+      "typeVersion": 2.1,
+      "webhookId": "814eb154-a53b-4767-9244-e9029fcf37b2",
+      "credentials": {
+        "smtp": {
+          "id": "aWjrYiNuc8kFdLXT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  json: {\n    device_id: $json.device_id || 'UNKNOWN',\n    moisture_level: parseFloat($json.moisture_level) || 0,\n    temperature: parseFloat($json.temperature) || 0,\n    humidity: parseFloat($json.humidity) || 0,\n    battery_level: parseFloat($json.battery_level) || 0,\n    location_lat: parseFloat($json.location_lat) || 0,\n    location_lng: parseFloat($json.location_lng) || 0,\n    data_source: $json.data_source || 'unknown'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        160
+      ],
+      "id": "caf39947-df22-43ff-9171-f94421113dbd",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b173e6af-f11a-45cb-8166-01f6c6237f18",
+              "name": "device_id",
+              "value": "={{ $json.device_id }}",
+              "type": "string"
+            },
+            {
+              "id": "5b43da58-b2f4-401d-9a5f-46aa58ae53e6",
+              "name": "moisture_level",
+              "value": "={{ $json.moisture_level }}",
+              "type": "number"
+            },
+            {
+              "id": "400267db-8a3a-4396-91b0-744e06a22d57",
+              "name": "temperature",
+              "value": "={{ $json.temperature }}",
+              "type": "number"
+            },
+            {
+              "id": "9c4257b5-76fd-4f8f-b8df-f2bd74a04155",
+              "name": "humidity",
+              "value": "={{ $json.humidity }}",
+              "type": "number"
+            },
+            {
+              "id": "a42b58e7-b8f4-47a3-9707-b3986dc5980d",
+              "name": "battery_level",
+              "value": "={{ $json.battery_level }}",
+              "type": "number"
+            },
+            {
+              "id": "b01ad644-4b42-4d1a-bfa9-384511c9b369",
+              "name": "location_lng",
+              "value": "={{ $json.location_lng }}",
+              "type": "number"
+            },
+            {
+              "id": "04eecbb8-8099-4f0d-9a77-20dffe94ba9e",
+              "name": "data_source",
+              "value": "={{ $json.data_source }}",
+              "type": "string"
+            },
+            {
+              "id": "8a738350-609a-4315-b5db-ae04bb7fe4dc",
+              "name": "created_at",
+              "value": "={{ $json.created_at }}",
+              "type": "string"
+            },
+            {
+              "id": "448dbce9-b517-4443-8e39-1518364a8875",
+              "name": "location_lat",
+              "value": "={{ $json.location_lat }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        176,
+        192
+      ],
+      "id": "681d1c18-649c-4186-a33d-9eaa70d59cd4",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b173e6af-f11a-45cb-8166-01f6c6237f18",
+              "name": "device_id",
+              "value": "={{ $json.device_id }}",
+              "type": "string"
+            },
+            {
+              "id": "5b43da58-b2f4-401d-9a5f-46aa58ae53e6",
+              "name": "moisture_level",
+              "value": "={{ $json.moisture_level }}",
+              "type": "number"
+            },
+            {
+              "id": "400267db-8a3a-4396-91b0-744e06a22d57",
+              "name": "temperature",
+              "value": "={{ $json.temperature }}",
+              "type": "number"
+            },
+            {
+              "id": "9c4257b5-76fd-4f8f-b8df-f2bd74a04155",
+              "name": "humidity",
+              "value": "={{ $json.humidity }}",
+              "type": "number"
+            },
+            {
+              "id": "a42b58e7-b8f4-47a3-9707-b3986dc5980d",
+              "name": "battery_level",
+              "value": "={{ $json.battery_level }}",
+              "type": "number"
+            },
+            {
+              "id": "b01ad644-4b42-4d1a-bfa9-384511c9b369",
+              "name": "location_lng",
+              "value": "={{ $json.location_lng }}",
+              "type": "number"
+            },
+            {
+              "id": "04eecbb8-8099-4f0d-9a77-20dffe94ba9e",
+              "name": "data_source",
+              "value": "={{ $json.data_source }}",
+              "type": "string"
+            },
+            {
+              "id": "8a738350-609a-4315-b5db-ae04bb7fe4dc",
+              "name": "created_at",
+              "value": "={{ $json.created_at }}",
+              "type": "string"
+            },
+            {
+              "id": "448dbce9-b517-4443-8e39-1518364a8875",
+              "name": "location_lat",
+              "value": "={{ $json.location_lat }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -176,
+        464
+      ],
+      "id": "1e56cb17-ea44-4a0b-9319-4b577feecb1e",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={\"moisture\":{{ $json.moisture_level }},\"temperature\":{{ $json.temperature }},\"humidity\":{{ $json.humidity }}}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "[\n  {\n    \"role\": \"user\",\n    \"content\": \"Analyze this soil data and provide farming recommendations:\\n\\nDevice: {{ $json.device_id }}\\nMoisture: {{ $json.moisture_level }}%\\nTemperature: {{ $json.temperature }}°C\\nHumidity: {{ $json.humidity }}%\\nBattery: {{ $json.battery_level }}%\\nData source: {{ $json.data_source }}\\n{{ $json.test_scenario ? 'Test scenario: ' + $json.scenario_description : '' }}\\n\\nProvide specific, actionable recommendations for this condition.\"\n  }\n]\nAll answer in Thai language."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        288,
+        384
+      ],
+      "id": "88311506-cc0b-44e1-b1f7-e7201144430d",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-20250514",
+          "cachedResultName": "Claude 4 Sonnet"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        176,
+        528
+      ],
+      "id": "2c3d5374-648c-40c5-a2cd-dfe9cc5ff75e",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "oeamqgEiONoMxdap",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        576
+      ],
+      "id": "07d70b46-8d11-4762-bbc7-76669a202081",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        320
+      ],
+      "id": "50c741ab-e7e8-4377-80ea-5b53ee91e3a6",
+      "name": "filterData"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.simulation }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              },
+              "id": "1ab8b88f-0f03-4554-ac75-b43dec6212ab"
+            },
+            {
+              "id": "41d28bcd-ab85-4fb9-a616-cd94457b4982",
+              "leftValue": "={{ $json.device_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "name": "Is Simulation Data1",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        768,
+        256
+      ],
+      "id": "9420b9bd-5370-4808-b0c3-5bf061e0687d",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "functionCode": "// Realistic Soil Moisture Data Simulator\nconst now = new Date();\nconst hour = now.getHours();\nconst minute = now.getMinutes();\n\n// Base moisture level (varies by time of day)\nlet baseMoisture;\nif (hour >= 6 && hour <= 10) {\n  // Morning - higher moisture from dew\n  baseMoisture = 90 + Math.sin((hour - 6) / 4 * Math.PI) * 10;\n} else if (hour >= 11 && hour <= 16) {\n  // Midday - decreasing moisture due to evaporation\n  baseMoisture = 55 - Math.sin((hour - 11) / 5 * Math.PI) * 15;\n} else if (hour >= 17 && hour <= 20) {\n  // Evening - stabilizing\n  baseMoisture = 45 + Math.sin((hour - 17) / 3 * Math.PI) * 8;\n} else {\n  // Night - gradual recovery\n  baseMoisture = 50 + Math.sin((hour + 12) / 12 * Math.PI) * 5;\n}\n\n// Add random variation (-5% to +5%)\nconst moistureVariation = (Math.random() - 0.5) * 10;\nconst moistureLevel = Math.max(0, Math.min(100, baseMoisture + moistureVariation));\n\n// Temperature simulation (realistic daily cycle)\nconst baseTemp = 25; // Base temperature\nconst tempVariation = Math.sin((hour - 6) / 12 * Math.PI) * 15; // Daily cycle\nconst randomTempVar = (Math.random() - 0.5) * 3; // Random variation\nconst temperature = Math.round((baseTemp + tempVariation + randomTempVar) * 10) / 10;\n\n// Humidity simulation (inverse relationship with temperature)\nconst baseHumidity = 80;\nconst humidityVar = -tempVariation * 0.8 + (Math.random() - 0.5) * 10;\nconst humidity = Math.max(20, Math.min(95, baseHumidity + humidityVar));\n\n// Battery level (slowly decreasing)\nconst dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));\nconst batteryLevel = Math.max(10, 100 - (dayOfYear * 0.2) + (Math.random() - 0.5) * 5);\nconst lowthreshold_moisture = 55;\nconst highthreshold_moisture = 95;\n\n// Simulate different devices\nconst devices = [\n  { id: 'SOIL_001', name: 'Field A - Tomatoes', lat: 40.7128, lng: -74.0060 },\n  { id: 'SOIL_002', name: 'Field B - Carrots', lat: 40.7580, lng: -73.9855 },\n  { id: 'SOIL_003', name: 'Greenhouse 1', lat: 40.7282, lng: -74.0776 }\n];\n\n// Randomly select a device (or cycle through them)\nconst deviceIndex = minute % devices.length;\nconst selectedDevice = devices[deviceIndex];\n\n// Create realistic data payload\nconst simulatedData = {\n  device_id: selectedDevice.id,\n  device_name: selectedDevice.name,\n  moisture_level: Math.round(moistureLevel * 100) / 100,\n  temperature: temperature,\n  humidity: Math.round(humidity * 100) / 100,\n  battery_level: Math.round(batteryLevel * 100) / 100,\n  location_lat: selectedDevice.lat,\n  location_lng: selectedDevice.lng,\n  timestamp: now.toISOString(),\n  signal_strength: Math.floor(Math.random() * 30) + 70, // 70-100%\n  sensor_status: 'active',\n  simulation: true // Flag to identify simulated data\n};\n\n// Occasionally simulate alert conditions for testing\nif (Math.random() < 0.1) { // 10% chance\n  if (Math.random() < 0.5) {\n    simulatedData.moisture_level = 15 + Math.random() * 10; // Low moisture\n  } else {\n    simulatedData.moisture_level = 85 + Math.random() * 10; // High moisture\n  }\n}\n\n// Occasionally simulate device issues\nif (Math.random() < 0.05) { // 5% chance\n  simulatedData.battery_level = 5 + Math.random() * 10; // Low battery\n  simulatedData.signal_strength = 20 + Math.random() * 30; // Poor signal\n}\n\nreturn {\n  json: simulatedData\n};"
+      },
+      "name": "Generate Realistic Data1",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        -832,
+        384
+      ],
+      "id": "03360b5e-1292-4148-a038-cab87740d2ac",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        688,
+        800
+      ],
+      "id": "7d8f0f31-dee4-4c66-b0c9-152540cb7dc1",
+      "name": "Merge",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1dcb5abc-848a-4f37-9b19-ac63fcdcf7ec",
+              "name": "lowthresholdmoist",
+              "value": 40,
+              "type": "number"
+            },
+            {
+              "id": "5a925e2f-711b-4531-89b0-b35aeacc3b1c",
+              "name": "highthresholdmoist",
+              "value": 95,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -832,
+        640
+      ],
+      "id": "fb351126-e87c-4973-b52e-ddc67191122d",
+      "name": "Edit Fields4"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -640,
+        528
+      ],
+      "id": "1e3ad1ce-44ae-4ed5-bc4a-05a9d5d93934",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fe94e7ed-8949-4ea5-909a-3e58d53f8a54",
+              "name": "device_id",
+              "value": "={{ $json.device_id }}",
+              "type": "string"
+            },
+            {
+              "id": "cff0b76b-836a-4605-829d-fef4da81a0ea",
+              "name": "moisture_level",
+              "value": "={{ $json.moisture_level }}",
+              "type": "number"
+            },
+            {
+              "id": "aea45217-afee-4152-8533-8fb22501ac3c",
+              "name": "temperature",
+              "value": "={{ $json.temperature }}",
+              "type": "number"
+            },
+            {
+              "id": "77e31a02-802d-4d72-b325-9eb5f41a91c7",
+              "name": "humidity",
+              "value": "={{ $json.humidity }}",
+              "type": "string"
+            },
+            {
+              "id": "8e2a3d23-2255-4341-999d-aafb830fe7a1",
+              "name": "battery_level",
+              "value": "={{ $json.battery_level }}",
+              "type": "number"
+            },
+            {
+              "id": "c5b1f3db-9446-44bc-bca6-ebb6688d70b1",
+              "name": "location_lat",
+              "value": "={{ $json.location_lat }}",
+              "type": "string"
+            },
+            {
+              "id": "13f111b9-4678-4bb0-a7f5-03c303db4e56",
+              "name": "location_lng",
+              "value": "={{ $json.location_lng }}",
+              "type": "string"
+            },
+            {
+              "id": "4b5ee507-2db0-4689-b5d1-24a39f79f508",
+              "name": "data_source",
+              "value": "={{ $json.data_source }}",
+              "type": "string"
+            },
+            {
+              "id": "83bea060-4ee2-42ea-b66c-766ead971791",
+              "name": "lowthresholdmoist",
+              "value": "={{ $json.lowthresholdmoist }}",
+              "type": "number"
+            },
+            {
+              "id": "d94ddf4b-a3e6-48d0-9e4a-b35cfd39a61a",
+              "name": "highthresholdmoist",
+              "value": "={{ $json.highthresholdmoist }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -512,
+        352
+      ],
+      "id": "0343e72f-46b1-49a2-b7b6-61efe4c12d7d",
+      "name": "combine_data"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1e80b7e3-6035-4544-806c-b3a2667cfff2",
+              "name": "lowthresholdmoist",
+              "value": "={{ $json.lowthresholdmoist }}",
+              "type": "string"
+            },
+            {
+              "id": "f1ab0ad8-3bab-423c-9b44-78986e3f1cb7",
+              "name": "highthresholdmoist",
+              "value": "={{ $json.highthresholdmoist }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        368,
+        1056
+      ],
+      "id": "9157b880-b5d4-45ec-9793-329eba504032",
+      "name": "lo_hi_setting"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.humidity }}",
+              "rightValue": 30,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              },
+              "id": "90c8876d-68e3-4447-a152-88c88ad4341c"
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "name": "<30=true",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        0,
+        624
+      ],
+      "id": "175bc628-4284-4fe8-bc73-1f65a75638df",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.humidity }}",
+              "rightValue": 90,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "id": "14c40a8a-1942-46d8-ad20-20c3f9a7e164"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": ">90=true",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        0,
+        768
+      ],
+      "id": "16fc55a0-04c6-4606-bbe8-caf9163ae567",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a731c7ec-a6d8-4b2e-8086-b971b50e668e",
+              "name": "temperature",
+              "value": "={{ $json.temperature }}",
+              "type": "string"
+            },
+            {
+              "id": "74378635-82dc-4431-9e82-03749a4e46b3",
+              "name": "humidity",
+              "value": "={{ $json.humidity }}",
+              "type": "string"
+            },
+            {
+              "id": "af497533-4256-48cc-a6d5-0c0b04880f71",
+              "name": "lowAlert",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        592
+      ],
+      "id": "00787588-4007-47a0-a89b-2a872a7ceff0",
+      "name": "lowAlert1-true"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a731c7ec-a6d8-4b2e-8086-b971b50e668e",
+              "name": "temperature",
+              "value": "={{ $json.temperature }}",
+              "type": "string"
+            },
+            {
+              "id": "74378635-82dc-4431-9e82-03749a4e46b3",
+              "name": "humidity",
+              "value": "={{ $json.humidity }}",
+              "type": "string"
+            },
+            {
+              "id": "d2548026-d4b2-4e6c-9065-92d1e0b69283",
+              "name": "lowAlert",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        272,
+        672
+      ],
+      "id": "07310a99-2264-4654-8b9a-383473a696f1",
+      "name": "lowAlert-false"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a731c7ec-a6d8-4b2e-8086-b971b50e668e",
+              "name": "temperature",
+              "value": "={{ $json.temperature }}",
+              "type": "string"
+            },
+            {
+              "id": "74378635-82dc-4431-9e82-03749a4e46b3",
+              "name": "humidity",
+              "value": "={{ $json.humidity }}",
+              "type": "string"
+            },
+            {
+              "id": "d2548026-d4b2-4e6c-9065-92d1e0b69283",
+              "name": "hiAlert",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        784
+      ],
+      "id": "d2023487-7e87-4773-b76f-955704495610",
+      "name": "hiAlert-true"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a731c7ec-a6d8-4b2e-8086-b971b50e668e",
+              "name": "temperature",
+              "value": "={{ $json.temperature }}",
+              "type": "string"
+            },
+            {
+              "id": "74378635-82dc-4431-9e82-03749a4e46b3",
+              "name": "humidity",
+              "value": "={{ $json.humidity }}",
+              "type": "string"
+            },
+            {
+              "id": "d2548026-d4b2-4e6c-9065-92d1e0b69283",
+              "name": "hiAlert",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        304,
+        896
+      ],
+      "id": "f0506e57-6635-4130-8a0f-ea3d2a4660e2",
+      "name": "hiAlert-false"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/tmp/soil_controller.txt",
+        "dataPropertyName": "=data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        816
+      ],
+      "id": "5b67b39a-e06b-4b21-9e25-79b16e7734b7",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Use only the first item\nconst firstItem = items[0];\n\n// Create Bangkok timestamp\nconst bangkokTime = new Date().toLocaleString('en-US', {\n  timeZone: 'Asia/Bangkok',\n  year: 'numeric',\n  month: '2-digit', \n  day: '2-digit',\n  hour: '2-digit',\n  minute: '2-digit',\n  second: '2-digit',\n  hour12: false\n});\n\n// Try to get AI data from different possible field locations\nlet aiRecommendation = \"No AI analysis available\";\nlet aiConfidence = null;\nlet aiActions = [];\n\n// Check multiple possible locations for AI data\nif (firstItem.json.output) {\n  aiRecommendation = $input.first().json.output;\n} else if (firstItem.json.ai_recommendation) {\n  aiRecommendation = firstItem.json.ai_recommendation;\n} else if (firstItem.json.content) {\n  // If AI response is in content field\n  if (Array.isArray(firstItem.json.content) && firstItem.json.content[0]) {\n    aiRecommendation = firstItem.json.content[0].text || firstItem.json.content[0];\n  } else {\n    aiRecommendation = firstItem.json.content;\n  }\n} else if (firstItem.json.response) {\n  aiRecommendation = firstItem.json.response;\n}\n\n// Clean up AI text if it's in Thai or contains unwanted characters\nif (typeof aiRecommendation === 'string') {\n  aiRecommendation = aiRecommendation.trim();\n}\n\nconst singleEntry = {\n  timestamp: bangkokTime,\n  timezone: \"Asia/Bangkok\",\n  temperature: parseFloat(firstItem.json.temperature) || null,\n  humidity: parseFloat(firstItem.json.humidity) || null,\n  lowAlert: firstItem.json.lowAlert || false,\n  hiAlert: firstItem.json.hiAlert || false,\n  lowthreshold: firstItem.json.lowthreshold || 40,\n  righthreshold: firstItem.json.righthreshold || 95,\n  alert_status: firstItem.json.lowAlert ? 'LOW_ALERT' : (firstItem.json.hiAlert ? 'HIGH_ALERT' : 'NORMAL'),\n  \n  // Add AI analysis section\n  ai_analysis: {\n    recommendation: aiRecommendation,\n    confidence: aiConfidence,\n    suggested_actions: aiActions,\n    analysis_available: aiRecommendation !== \"No AI analysis available\"\n  }\n};\n\nconst jsonContent = JSON.stringify(singleEntry, null, 2);\n\nreturn [{\n  json: {\n    file_path: `/tmp/soil_data_${new Date().toISOString().split('T')[0]}.txt`,\n    file_content: jsonContent\n  },\n  binary: {\n    data: {\n      data: Buffer.from(jsonContent, 'utf8'),\n      mimeType: 'text/plain'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        816
+      ],
+      "id": "2e214b2d-d568-4f88-be22-c9ed98c30357",
+      "name": "format4File"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Data Simulator Trigger": {
+      "main": [
+        [
+          {
+            "node": "Generate Realistic Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Edit Fields4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Realistic Data": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Simulation Data": {
+      "main": [
+        [
+          {
+            "node": "Process Simulation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Simulation": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Alert Scenarios": {
+      "main": [
+        [
+          {
+            "node": "Generate Realistic Data1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Edit Fields4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store in PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Store in PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "<30=true",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": ">90=true",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "filterData",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Send Email Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "format4File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Alert to Database": {
+      "main": [
+        []
+      ]
+    },
+    "filterData": {
+      "main": [
+        [
+          {
+            "node": "Is Simulation Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Simulation Data1": {
+      "main": [
+        [
+          {
+            "node": "Log Alert to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Realistic Data1": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "format4File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields4": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "lo_hi_setting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "combine_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "combine_data": {
+      "main": [
+        [
+          {
+            "node": "Is Simulation Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "lo_hi_setting": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "<30=true": {
+      "main": [
+        [
+          {
+            "node": "lowAlert1-true",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "lowAlert-false",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    ">90=true": {
+      "main": [
+        [
+          {
+            "node": "hiAlert-true",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "hiAlert-false",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "lowAlert1-true": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "lowAlert-false": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "hiAlert-true": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "hiAlert-false": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "format4File": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Bangkok",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "d878fc7c-e6c1-42af-8231-3b6d04b5012f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4bb4a68fdd357fb01031eb3ecc86b085d8269ff27ce26b5cf53f4afa0ad6fb17"
+  },
+  "id": "rDU2Al8xbnApynLn",
+  "tags": []
+}
